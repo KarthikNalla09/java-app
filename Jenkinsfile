@@ -68,7 +68,7 @@ pipeline {
         
 		withCredentials([string(credentialsId: 'DOCKER_USER', variable: 'DOCKER_USER'), string(credentialsId: 'PASSWD', variable: 'DOCKER_PASSWORD')]) {
             sh 'docker login -u $DOCKER_USER -p $DOCKER_PASSWORD'
-              sh  'docker push ishaqmd/javaapp:latest'
+              sh  'docker push karthiknalla09/java-app:latest'
           }
 		  
 
