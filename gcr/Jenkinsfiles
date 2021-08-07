@@ -1,0 +1,92 @@
+pipeline {
+    agent any
+    tools
+    {
+       maven "Maven"
+    }
+
+    environment {
+    SVC_ACCOUNT_KEY = credentials('GCR_IO')
+  }
+     
+    stages {
+        stage ('checkout'){
+            steps {
+                git branch: 'master', url: 'https://github.com/ishaqmdgcp/jar.git'
+            }
+        }
+      
+      stage('Execute Maven') {
+           steps {
+             
+                sh 'mvn clean install'           
+          }
+        }
+
+		stage('Set creds') {
+            steps {
+              
+                sh 'echo $SVC_ACCOUNT_KEY | base64 -d > ./gcr/terraform.json'
+		            sh 'pwd'
+                       
+               
+            }
+        }
+	
+	stage('Build image') {
+	 steps {
+        /* Below command specifies exactly like the command line */
+    
+        sh 'docker build -t gcr.io/nasalab-316914/javaapp2 .'
+    }
+    }
+        
+        stage('Push Image to GCR') {
+		 steps {  
+			  dir('gcr')
+			 {
+        sh 'gcloud auth activate-service-account nasa7733@nasalab-316914.iam.gserviceaccount.com --key-file=terraform.json'
+	sh 'gcloud auth configure-docker'
+        sh 'docker push gcr.io/nasalab-316914/javaapp1'
+			 }
+		 }
+	 }
+	 
+	 
+	stage('Create GKE cluster') {
+	 steps {
+    
+        sh 'gcloud container clusters create samples-cluster --zone us-central1-a --num-nodes=1'
+    }
+    }
+    
+    stage('Get creds from GKE cluster') {
+	 steps {
+    
+        sh 'gcloud container clusters get-credentials samples-cluster --zone us-central1-a --project nasalab-316914'
+    }
+    }
+    
+    stage('App Deploy') {
+	 steps {
+	 dir('gcr')
+			 {
+        /* Below command specifies exactly like the command line */
+    
+        sh 'kubectl apply -f deployment.yaml'
+	sh 'sleep 60s'
+	
+    }
+    }
+    }
+    
+    stage('Test App Deploy') {
+	 steps {
+    
+        sh 'http://35.194.40.82:8080/hello'
+	
+    
+    }
+    }
+   }
+}
