@@ -1,36 +1,81 @@
-node {
-    def app
-
-    stage('Clone repository') {
-        /* Clone the repository to our Jenkins Workspace */
-
-        checkout scm
+pipeline {
+    agent any
+	
+	  tools
+    {
+       maven "Maven"
     }
-
-    stage('Build image') {
-        /* Below command specifies exactly like the command line */
-    
-        app = docker.build("ishaqmd/javaapp")
-    }
-    
-    stage('Test image') {
+ stages {
+      stage('checkout') {
+           steps {
+             
+                git branch: 'master', url: 'https://github.com/KarthikNalla09/java-app.git'
+             
+          }
+        }
+	 stage('Execute Maven') {
+           steps {
+             
+                sh 'mvn package'             
+          }
+        }
         
-        app.inside {
-            sh 'echo "Tests passed"'
+
+  stage('Docker Build and Tag') {
+           steps {
+                
+                sh 'docker build -t samplewebapp:latest .' 
+                sh 'docker tag samplewebapp karthiknalla09/java-app:latest'
+               	                 
+          }
         }
-    }
-    
-    stage('Push image to docker-hub') {
-        /* Finally, we'll push the image with two tags:
-         * First, the incremental build number from Jenkins
-         * Second, the 'latest' tag.
-         * Pushing multiple tags is cheap, as all the layers are reused. */
-        docker.withRegistry('https://registry.hub.docker.com', 'DOCKER_HUB') {
-            app.push("${env.BUILD_NUMBER}")
-            app.push("latest")
+     
+       
+      stage('Run Docker') {
+             
+            steps 
+			{
+                sh "docker run --name java-app -d -p 8008:8080 karthiknalla09/java-app:latest"
+				sh 'sleep 10'
+				
+				
+ 
+            }
         }
+	 
+	 
+	 stage('Test') {
+           steps {
+                
+               sh 'curl localhost:8080/health'
+				sh 'sleep 20'
+               	                 
+          }
+        }
+ 
+	 stage('Delete infra') {
+           steps {
+                
+                sh 'docker stop java-app'
+				sh 'docker rm java-app'
+               	                 
+          }
+        }
+	 
+	 stage('Publish image to Docker Hub') {
+          
+            steps {
+        
+		withCredentials([string(credentialsId: 'DOCKER_USER', variable: 'DOCKER_USER'), string(credentialsId: 'PASSWD', variable: 'DOCKER_PASSWORD')]) {
+            sh 'docker login -u $DOCKER_USER -p $DOCKER_PASSWORD'
+              sh  'docker push ishaqmd/javaapp:latest'
+          }
+		  
+
+}
+        
+                  
+          
+  }
     }
-    
-     
-     
-    }
+	}
